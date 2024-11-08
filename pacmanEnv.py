@@ -1,4 +1,6 @@
 import gymnasium as gym
+import pygame
+import numpy as np
 
 class PacMan(gym.Env):
     # TODO: initialize environment, self.observation_space, self.action_space etc.
@@ -19,3 +21,8 @@ class PacMan(gym.Env):
     # TODO: Use pygame to display the current state
     def render(self):
         return 
+
+    def close(self):
+        if self.window is not None:
+            pygame.display.quit()
+            pygame.quit()
