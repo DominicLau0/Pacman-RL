@@ -5,7 +5,10 @@ import numpy
 import matplotlib.pyplot as plt
 import random
 import torch
+import time
 
+# TODO: Normalize state to avoid overflow errors
+# Algorithm Lecture 9, Slide 6 
 class PacManSARSA():
 
     def train(self, episodes=100, render=False):
@@ -13,7 +16,7 @@ class PacManSARSA():
         epsilon = 1
         decay = 0.00001
         alpha = 0.1
-        gamma = 0.8
+        gamma = 0.9
         d = 210*160*3 # state features --> 100,800
         k = 9 # actions
         w = np.random.rand(d, k).astype(numpy.float64)
@@ -46,9 +49,9 @@ class PacManSARSA():
                 obs, reward, terminated, truncated, info = env.step(action)
                 statePrime = obs.flatten()
 
-                # don't decay epsilon past 10%
-                if(epsilon < 0.1):
-                    epsilon = 0.1
+                # don't decay epsilon past 5%
+                if(epsilon < 0.05):
+                    epsilon = 0.05
 
                 randVal = random.random()
                 # take random action
@@ -68,11 +71,15 @@ class PacManSARSA():
                 rewards[i] += reward
                 episode_over = terminated or truncated
 
-                values = torch.tensor(w.T[action])
-                semiGradient = torch.gradient(values)
-                semiGradient = semiGradient[0].numpy()
+                # TODO: check if gradient is needed...
+                # values = torch.tensor(w.T[action])
+                # semiGradient = torch.gradient(values)
+                # semiGradient = semiGradient[0].numpy()
 
-                change = alpha * (reward + gamma * (qSAPrime) - qSA) * semiGradient
+                if terminated:
+                    change = alpha * (reward - qSA) * state
+                else:
+                    change = alpha * (reward + gamma * (qSAPrime) - qSA) * state
                 w.T[action] = w.T[action] + change
 
                 epsilon -= decay
@@ -80,7 +87,7 @@ class PacManSARSA():
 
         env.close()
 
-        graphRewards(rewards, "SARSA_Rewards")
+        graphRewards(rewards, "SARSA Rewards")
 
 def graphRewards(data, title):
     # Create new graph 
@@ -93,6 +100,9 @@ def graphRewards(data, title):
     fileName = title + ".png"
     plt.savefig(fileName)
 
-# if __name__ == '__main__':
-#     pacMan = PacManSARSA()
-#     pacMan.train(20)
+if __name__ == '__main__':
+    pacMan = PacManSARSA()
+    start = time.time()
+    pacMan.train(500)
+    end = time.time()
+    print(f"Took {end-start:.3f} seconds")
