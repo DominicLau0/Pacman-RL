@@ -6,52 +6,62 @@ import matplotlib.pyplot as plt
 import random
 import torch
 import time
+import sys
+# numpy.set_printoptions(threshold=sys.maxsize)
 
-# TODO: Normalize state to avoid overflow errors
-# Algorithm Lecture 9, Slide 6 
+class ObservationWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+    def observation(self, obs):
+        # Normalise observation by 10000
+        return obs / 10000
+
+# Algorithm Lecture 9, Slide 6
 class PacManSARSA():
 
     def train(self, episodes=100, render=False):
         # hyperparameters
-        epsilon = 1
-        decay = 0.00001
+        epsilon = 0.1
         alpha = 0.1
         gamma = 0.9
         d = 210*160*3 # state features --> 100,800
+        # d = 32*32*3
         k = 9 # actions
-        w = np.random.rand(d, k).astype(numpy.float64)
-        
+        w = np.random.rand(d, k)
+
         env = gym.make('ALE/MsPacman-v5', render_mode=None)
-        
+        # print(f"Initial observation space: {env.observation_space.shape}")
+        wrapped_env = ObservationWrapper(env)
+        # wrapped_env = gym.wrappers.ResizeObservation(wrapped_env, 32)
+        # print(f"New observation space: {env.observation_space.shape}")
+
         rewards = np.zeros(episodes)
-        counter = 0
-        
+
         for i in range(episodes):
-            counter += 1
-            print(f"Episode {counter}, epsilon={epsilon}")
-            obs, info = env.reset()
+            print(f"Episode {i}")
+            # initialize S and choose A
+            obs = wrapped_env.reset()
             state = obs.flatten()
             episode_over = False
+
+            q = w.T @ state
             randVal = random.random()
-                
+
             # take random action
             if randVal < epsilon:
                 action = env.action_space.sample()
             # take the greedy action
             else:
                 action = np.argmax(q)
-            
-            while not episode_over:
-                q = w.T @ state
-                qSum = np.sum(q)
-                q = np.divide(q, qSum) # divide by sum to avoid overflow errors
 
-                obs, reward, terminated, truncated, info = env.step(action)
+            while not episode_over:
+                # take action A, observe R, S'
+                obs, reward, terminated, info = wrapped_env.step(action)
                 statePrime = obs.flatten()
 
-                # don't decay epsilon past 5%
-                if(epsilon < 0.05):
-                    epsilon = 0.05
+                # choose A'
+                qPrime = w.T @ statePrime
 
                 randVal = random.random()
                 # take random action
@@ -59,35 +69,32 @@ class PacManSARSA():
                     actionPrime = env.action_space.sample()
                 # take the greedy action
                 else:
-                    actionPrime = np.argmax(q)
-                
-                qSA = w.T[action] @ state
-                qSAPrime = w.T[actionPrime] @ statePrime
-                
-                qSA = np.divide(qSA, qSum) # divide by sum to avoid overflow errors
-                
-                qSAPrime = np.divide(qSAPrime, qSum) # divide by sum to avoid overflow errors
-                
+                    actionPrime = np.argmax(qPrime)
+
+                qSA = w[:, action] @ state
+                qSAPrime = w[:, actionPrime] @ statePrime
+
+                # print(f"state-action value: {qSA}")
+                # print(f"Next state-action value: {qSAPrime}")
+
                 rewards[i] += reward
-                episode_over = terminated or truncated
+                episode_over = terminated
 
-                # TODO: check if gradient is needed...
-                # values = torch.tensor(w.T[action])
-                # semiGradient = torch.gradient(values)
-                # semiGradient = semiGradient[0].numpy()
-
+                # update W
                 if terminated:
                     change = alpha * (reward - qSA) * state
                 else:
                     change = alpha * (reward + gamma * (qSAPrime) - qSA) * state
-                w.T[action] = w.T[action] + change
 
-                epsilon -= decay
+                w[:, action] += change
+
                 action = actionPrime
+                state = statePrime
 
         env.close()
 
         graphRewards(rewards, "SARSA Rewards")
+        return w
 
 def graphRewards(data, title):
     # Create new graph 
