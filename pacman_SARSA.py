@@ -7,6 +7,9 @@ import random
 import torch
 import time
 import sys
+import os
+
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 # numpy.set_printoptions(threshold=sys.maxsize)
 
 class ObservationWrapper(gym.ObservationWrapper):
@@ -41,7 +44,7 @@ class PacManSARSA():
         for i in range(episodes):
             print(f"Episode {i}")
             # initialize S and choose A
-            obs = wrapped_env.reset()
+            obs, info = wrapped_env.reset()
             state = obs.flatten()
             episode_over = False
 
@@ -57,7 +60,7 @@ class PacManSARSA():
 
             while not episode_over:
                 # take action A, observe R, S'
-                obs, reward, terminated, info = wrapped_env.step(action)
+                obs, reward, terminated, truncated, info = wrapped_env.step(action)
                 statePrime = obs.flatten()
 
                 # choose A'
@@ -78,7 +81,7 @@ class PacManSARSA():
                 # print(f"Next state-action value: {qSAPrime}")
 
                 rewards[i] += reward
-                episode_over = terminated
+                episode_over = terminated or truncated
 
                 # update W
                 if terminated:
