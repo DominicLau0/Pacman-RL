@@ -1,109 +1,172 @@
 import gymnasium as gym
 import ale_py
 import numpy as np
-import numpy 
 import matplotlib.pyplot as plt
 import random
-import torch
 import time
-import sys
 import os
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-# numpy.set_printoptions(threshold=sys.maxsize)
+
+# random.seed(10)
+# np.random.seed(seed=10)
 
 class ObservationWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
 
     def observation(self, obs):
-        # Normalise observation by 10000
-        return obs / 10000
+        # Normalize observation by 255 to prevent overflow errors
+        return obs / 255
 
 # Algorithm Lecture 9, Slide 6
-class PacManSARSA():
+class FunctionApproximation():
+    # Hyperparameters
+    epsilon = 0.1
+    gamma = 0.99
+    step_size = 0.001
 
-    def train(self, episodes=100, render=False):
-        # hyperparameters
-        epsilon = 0.1
-        alpha = 0.1
-        gamma = 0.9
-        d = 210*160*3 # state features --> 100,800
-        # d = 32*32*3
-        k = 9 # actions
-        w = np.random.rand(d, k)
+    def epsilonGreedy(self, env, x, W):
+        randVal = random.random()
 
-        env = gym.make('ALE/MsPacman-v5', render_mode=None)
-        # print(f"Initial observation space: {env.observation_space.shape}")
-        wrapped_env = ObservationWrapper(env)
-        # wrapped_env = gym.wrappers.ResizeObservation(wrapped_env, 32)
-        # print(f"New observation space: {env.observation_space.shape}")
+        if randVal < self.epsilon:
+            action = env.action_space.sample()
+        else:
+            action = np.argmax(W.T @ x)
+    
+        return action
+
+    def SARSA(self, env, episodes=50000):
+        d = 128
+        k = env.action_space.n
+        # initialize W randomly
+        W = np.random.rand(d, k)
+        
+        rewards = np.zeros(episodes)
+
+        for i in range(episodes):
+            # Initialize S and choose A
+            s, info = env.reset()
+            a = self.epsilonGreedy(env, s, W)
+        
+            episode_over = False
+            while not episode_over:
+                
+                # Take action A, Observe R, S'
+                sPrime, reward, terminated, truncated, info = env.step(a)
+                
+                # Choose A'
+                aPrime = self.epsilonGreedy(env, sPrime, W)
+                
+                # update W
+                if terminated:
+                    error = reward - (W[:, a] @ s)
+                else:
+                    error = reward + (self.gamma * (W[:, aPrime] @ sPrime)) - (W[:, a] @ s)
+                
+                W[:, a] = W[:, a] + (self.step_size * error * s)
+                
+                rewards[i] += reward
+                
+                # Proceed to next state of env
+                s = sPrime
+                a = aPrime
+                episode_over = terminated or truncated
+
+        if episodes > 1000 and episodes % 1000 == 0:
+            # get runtime average of rewards (avg rewards of every 1000 games)
+            mean = np.mean(rewards.reshape(-1, 1000), axis=1)
+        else:
+            mean = rewards
+        
+        graphRewards(mean, "FA SARSA rewards")
+
+        return W
+    
+    def QLearning(self, env, episodes=50000):
+        d = 128
+        k = env.action_space.n
+
+        # initialize parameters W
+        W = np.random.rand(d, k)
 
         rewards = np.zeros(episodes)
 
         for i in range(episodes):
-            print(f"Episode {i}")
-            # initialize S and choose A
-            obs, info = wrapped_env.reset()
-            state = obs.flatten()
+            # initialize S
+            s, info = env.reset()
+
             episode_over = False
-
-            q = w.T @ state
-            randVal = random.random()
-
-            # take random action
-            if randVal < epsilon:
-                action = env.action_space.sample()
-            # take the greedy action
-            else:
-                action = np.argmax(q)
-
             while not episode_over:
-                # take action A, observe R, S'
-                obs, reward, terminated, truncated, info = wrapped_env.step(action)
-                statePrime = obs.flatten()
 
-                # choose A'
-                qPrime = w.T @ statePrime
-
-                randVal = random.random()
-                # take random action
-                if randVal < epsilon:
-                    actionPrime = env.action_space.sample()
-                # take the greedy action
-                else:
-                    actionPrime = np.argmax(qPrime)
-
-                qSA = w[:, action] @ state
-                qSAPrime = w[:, actionPrime] @ statePrime
-
-                # print(f"state-action value: {qSA}")
-                # print(f"Next state-action value: {qSAPrime}")
-
-                rewards[i] += reward
-                episode_over = terminated or truncated
+                a = self.epsilonGreedy(env, s, W)
+                
+                # Take action A, observe R, S'
+                sPrime, reward, terminated, truncated, info = env.step(a)
 
                 # update W
                 if terminated:
-                    change = alpha * (reward - qSA) * state
+                    error = reward - (W[:, a] @ s)
                 else:
-                    change = alpha * (reward + gamma * (qSAPrime) - qSA) * state
+                    error = reward + (self.gamma * np.max(W.T @ sPrime)) - (W[:, a] @ s)
+                
+                W[:, a] = W[:, a] + (self.step_size * error * s)
+                
+                rewards[i] += reward
+                
+                # Proceed to next state of env
+                s = sPrime
+                episode_over = terminated or truncated
 
-                w[:, action] += change
+        if episodes > 1000 and episodes % 1000 == 0:
+            # get runtime average of rewards (avg rewards of every 1000 games)
+            mean = np.mean(rewards.reshape(-1, 1000), axis=1)
+        else:
+            mean = rewards
+        
+        graphRewards(mean, "FA QL rewards")
 
-                action = actionPrime
+        return W
+
+    def test(self, w, episodes=5):
+
+        env = gym.make('ALE/MsPacman-v5', obs_type="ram", render_mode="human")
+        wrapped_env = ObservationWrapper(env)
+
+        d = 128 # state features
+        k = env.action_space.n # actions
+        w = np.random.rand(d, k)
+
+        rewards = np.zeros(episodes)
+
+        for i in range(episodes):
+            print(f"Game {i+1}")
+
+            # initialize S and choose A
+            state, info = wrapped_env.reset()
+            
+            episode_over = False
+
+            while not episode_over:
+
+                # always greedy
+                action = np.argmax(w.T @ state)
+
+                # take action A, observe R, S'
+                statePrime, reward, terminated, truncated, info = wrapped_env.step(action)
+
                 state = statePrime
+                
+                rewards[i] += reward
+                episode_over = terminated or truncated
 
         env.close()
 
-        graphRewards(rewards, "SARSA Rewards")
-        return w
+        graphRewards(rewards, "Test Rewards")
 
 def graphRewards(data, title):
-    # Create new graph 
-    plt.figure(1)
+    plt.figure()
     plt.suptitle(title)
-    plt.xlabel('Timestep')
     plt.ylabel('Rewards')
     plt.plot(data)
     
@@ -111,8 +174,17 @@ def graphRewards(data, title):
     plt.savefig(fileName)
 
 if __name__ == '__main__':
-    pacMan = PacManSARSA()
+    pacMan = FunctionApproximation()
+    
+    env = gym.make('ALE/MsPacman-v5', obs_type="ram", render_mode=None)
+    env = ObservationWrapper(env)
+
     start = time.time()
-    pacMan.train(500)
+    w = pacMan.SARSA(env, 50000)
+    # w = pacMan.QLearning(env, 50000)
     end = time.time()
     print(f"Took {end-start:.3f} seconds")
+    env.close()
+    
+    input("Press the Enter key to continue: ") 
+    pacMan.test(w)
