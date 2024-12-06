@@ -6,7 +6,7 @@ from pacman_dql import pacmanDQL
 
 def createEnv():
     # env = PacMan()
-    env = gym.make('ALE/MsPacman-v5', render_mode=None)
+    env = gym.make('ALE/MsPacman-v5', render_mode=None, obs_type="grayscale")
     executePacmanDQL(env)
     env.close()
 
