@@ -6,13 +6,16 @@ import random
 import time
 import sys
 import torch
+import os
+
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 class ObservationWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
 
     def observation(self, obs):
-        return obs / 10000
+        return obs / 255
 
 class PacManActorCritic:
     def train(self, episodes=100, render=False):
@@ -35,7 +38,7 @@ class PacManActorCritic:
 
         for i in range(episodes):
             print(f"Episode {i+1}")
-            obs = wrapped_env.reset()
+            obs, info = wrapped_env.reset()
             state = obs.flatten()
             episode_over = False
             total_reward = 0
@@ -52,7 +55,7 @@ class PacManActorCritic:
                 value = critic_weights @ state
 
                 # Take action and observe new state, reward
-                obs, reward, terminated, info = wrapped_env.step(action)
+                obs, reward, terminated, truncated, info = wrapped_env.step(action)
                 state_prime = obs.flatten()
 
                 # Calculate policy probabilities (softmax)
@@ -83,10 +86,28 @@ class PacManActorCritic:
                 state = state_prime
                 action = action_prime
                 total_reward += reward
-                episode_over = terminated
+                episode_over = terminated or truncated
 
             rewards[i] = total_reward
 
         env.close()
+        graph_rewards(rewards, "10000 Actor-Critic Rewards")
         return actor_weights, critic_weights
 
+def graph_rewards(data, title):
+    # Create new graph
+    plt.figure(1)
+    plt.suptitle(title)
+    plt.xlabel("Episodes")
+    plt.ylabel("Total Rewards")
+    plt.plot(data)
+
+    file_name = title + ".png"
+    plt.savefig(file_name)
+
+if __name__ == '__main__':
+    pacman_ac = PacManActorCritic()
+    start = time.time()
+    pacman_ac.train(episodes=10000)
+    end = time.time()
+    print(f"Took {end - start:.3f} seconds")
