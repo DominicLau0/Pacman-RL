@@ -40,7 +40,7 @@ def runFunctionApproximation():
 
 if __name__ == "__main__":
     ### DQL (Dominic) ###
-    # runDQL()
+    runDQL()
     
     ### Function Approximation (Sara) ###
-    runFunctionApproximation()
+    #runFunctionApproximation()
