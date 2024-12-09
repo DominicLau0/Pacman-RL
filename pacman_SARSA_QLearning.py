@@ -72,14 +72,9 @@ class FunctionApproximation():
                 s = sPrime
                 a = aPrime
                 episode_over = terminated or truncated
-
-        if episodes > 1000 and episodes % 1000 == 0:
-            # get runtime average of rewards (avg rewards of every 1000 games)
-            mean = np.mean(rewards.reshape(-1, 1000), axis=1)
-        else:
-            mean = rewards
         
-        graphRewards(mean, "FA SARSA rewards")
+        graphRewards(rewards)
+        average_graphRewards(rewards)
 
         return W
     
@@ -118,13 +113,8 @@ class FunctionApproximation():
                 s = sPrime
                 episode_over = terminated or truncated
 
-        if episodes > 1000 and episodes % 1000 == 0:
-            # get runtime average of rewards (avg rewards of every 1000 games)
-            mean = np.mean(rewards.reshape(-1, 1000), axis=1)
-        else:
-            mean = rewards
-        
-        graphRewards(mean, "FA QL rewards")
+        graphRewards(rewards)
+        average_graphRewards(rewards)
 
         return W
 
@@ -164,27 +154,26 @@ class FunctionApproximation():
 
         graphRewards(rewards, "Test Rewards")
 
-def graphRewards(data, title):
+def graphRewards(rewards):
     plt.figure()
-    plt.suptitle(title)
+    plt.suptitle("Rewards for SARSA")
+    plt.xlabel('Episodes')
     plt.ylabel('Rewards')
-    plt.plot(data)
+    plt.plot(rewards, label="Rewards")
     
-    fileName = title + ".png"
+    fileName = "SARSA" + ".png"
     plt.savefig(fileName)
+    return
 
-if __name__ == '__main__':
-    pacMan = FunctionApproximation()
-    
-    env = gym.make('ALE/MsPacman-v5', obs_type="ram", render_mode=None)
-    env = ObservationWrapper(env)
+def average_graphRewards(rewards):
+    rewards = np.mean(np.array(rewards).reshape(-1, 1000), axis=1)
 
-    start = time.time()
-    w = pacMan.SARSA(env, 50000)
-    # w = pacMan.QLearning(env, 50000)
-    end = time.time()
-    print(f"Took {end-start:.3f} seconds")
-    env.close()
+    plt.figure()
+    plt.suptitle("Average Rewards for SARSA")
+    plt.xlabel('Episodes (averaged over every 1000 games)')
+    plt.ylabel('Average Rewards')
+    plt.plot(rewards, label="Rewards")
     
-    input("Press the Enter key to continue: ") 
-    pacMan.test(w)
+    fileName = "SARSA_Averaged" + ".png"
+    plt.savefig(fileName)
+    return

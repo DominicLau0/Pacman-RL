@@ -62,13 +62,13 @@ def DQL():
 
 if __name__ == "__main__": 
     # Execute SARSA
-    # SARSA()
+    SARSA()
 
     # Execute Q-Learning
-    # QLearning()
+    QLearning()
 
     # Execute Actor-Critic
-    # Actor_Critic()
+    Actor_Critic()
 
     # Execute Deep-Q Learning
     DQL()

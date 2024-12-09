@@ -92,6 +92,8 @@ class PacManActorCritic:
 
         env.close()
         graph_rewards(rewards, "10000 Actor-Critic Rewards")
+        average_graphRewards(rewards)
+
         return actor_weights, critic_weights
 
 def graph_rewards(data, title):
@@ -105,9 +107,16 @@ def graph_rewards(data, title):
     file_name = title + ".png"
     plt.savefig(file_name)
 
-if __name__ == '__main__':
-    pacman_ac = PacManActorCritic()
-    start = time.time()
-    pacman_ac.train(episodes=10000)
-    end = time.time()
-    print(f"Took {end - start:.3f} seconds")
+
+def average_graphRewards(rewards):
+    rewards = np.mean(np.array(rewards).reshape(-1, 100), axis=1)
+
+    plt.figure()
+    plt.suptitle("Average Rewards for Actor-Critic")
+    plt.xlabel('Episodes (averaged over every 100 games)')
+    plt.ylabel('Average Rewards')
+    plt.plot(rewards, label="Rewards")
+    
+    fileName = "Actor-Critic_Averaged" + ".png"
+    plt.savefig(fileName)
+    return
